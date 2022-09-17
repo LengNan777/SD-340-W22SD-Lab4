@@ -1,43 +1,56 @@
+using Microsoft.EntityFrameworkCore;
+using SD_340_W22SD_Lab4.Models;
+
 var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
+builder.Services.AddDbContext<SD340W22SDLab4Context>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("SD340W22SDLab4Context")));
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.MapGet("/", async () =>
+    "Welcome to the transit website! \n\n" +
+    "You can input the following command in address after the port number: \n\n" +
+    "/routes \n to check all routes information\n\n" +
+    "/routes/{id} \n to check the specific route\n\n" +
+    "/stops \n to check all stops information\n\n" +
+    "/stops/{id} \n to check the specific stop information \n\n" +
+    "/stopSchedule \n to check all scheduled for all stops." +
+    "/stopSchedule?number={}&top={} \n to check \"top\" amount of scheduled stops for stop."
+);
 
-app.UseHttpsRedirection();
+app.MapGet("/routes", async (SD340W22SDLab4Context db) =>
+    await db.Routes.ToListAsync()
+);
 
-var summaries = new[]
+app.MapGet("/routes/{id}", async (int id, SD340W22SDLab4Context db) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    var result = await db.Routes.FindAsync(id);
+    if (result != null)
+    {
+        return Results.Ok(result);
+    }
+    else
+    {
+        return Results.NotFound();
+    }
+});
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateTime.Now.AddDays(index),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+app.MapGet("/stops", async (SD340W22SDLab4Context db) =>
+    await db.Stops.ToListAsync()
+);
+
+app.MapGet("/stops/{id}", async (int id, SD340W22SDLab4Context db) =>
+    await db.Stops.Where(s => s.Number == id).ToListAsync()
+);
+
+app.MapGet("/stopSchedule", async (int? number, int? top, SD340W22SDLab4Context db) =>
+{   
+    if(number != null && top != null)
+    {
+        return await db.ScheduledStops.Where(s => s.StopNumber == number).Take((int)top).ToListAsync();
+    }
+    else
+    {
+        return await db.ScheduledStops.ToListAsync();
+    } 
+});
 
 app.Run();
-
-internal record WeatherForecast(DateTime Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
